@@ -178,6 +178,12 @@ export type ScreenerResult = {
   reason: string;
 };
 
+export type LastScanSnapshot = {
+  source: MarketDataSource;
+  savedAt: string;
+  results: ScreenerResult[];
+};
+
 export type TrendlinePoint = {
   time: number;
   price: number;

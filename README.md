@@ -9,6 +9,7 @@ The current release supports public Gate.io and OKX USDT-perpetual market data, 
 - Configurable price-change and volume filters
 - Multi-timeframe MACD, RSI, and Bollinger Band conditions
 - Automatic refresh and watchlist-only screening
+- Mobile-friendly screener cards with latest-scan snapshot storage
 - Separate Gate.io and OKX watchlists
 - Candlestick and Heikin-Ashi charts
 - Optional MACD, RSI, and Bollinger Band chart overlays
@@ -31,6 +32,16 @@ Open `http://127.0.0.1:5173`.
 npm test
 npm run build
 ```
+
+## Deploy to Cloudflare Pages
+
+Use these Cloudflare Pages build settings:
+
+- Production branch: `main`
+- Build command: `npm run build`
+- Build output directory: `dist`
+
+The `functions/` directory provides Cloudflare Pages Functions for the production `/gate` and `/okx` market-data proxy routes. Local development still uses the Vite proxy configured in `vite.config.ts`.
 
 ## Data sources
 

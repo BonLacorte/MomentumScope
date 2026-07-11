@@ -1,13 +1,13 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertCircle, RefreshCcw, Search, Star, X } from "lucide-react";
+import { Activity, AlertCircle, BarChart3, RefreshCcw, Search, Star, X } from "lucide-react";
 import { useRef } from "react";
 import ChartPanel from "./components/ChartPanel";
 import ResultsTable from "./components/ResultsTable";
 import ScreenerToolbar from "./components/ScreenerToolbar";
 import { getMarketDataProvider } from "./lib/marketData";
 import { runScreener } from "./lib/screener";
-import { loadChartIndicators, loadDataSource, loadSettings, loadTrendlines, loadWatchlist, saveChartIndicators, saveDataSource, saveSettings, saveTrendlines, saveWatchlist } from "./lib/storage";
-import type { Candle, CandleMode, ChartIndicator, Instrument, MarketDataSource, ScreenerResult, ScreenerSettings, Timeframe, Trendline } from "./types";
+import { loadChartIndicators, loadDataSource, loadLastScanSnapshot, loadSettings, loadTrendlines, loadWatchlist, saveChartIndicators, saveDataSource, saveLastScanSnapshot, saveSettings, saveTrendlines, saveWatchlist } from "./lib/storage";
+import type { Candle, CandleMode, ChartIndicator, Instrument, LastScanSnapshot, MarketDataSource, ScreenerResult, ScreenerSettings, Timeframe, Trendline } from "./types";
 
 const TIMEFRAMES: Timeframe[] = ["5m", "15m", "1H", "4H", "1D"];
 
@@ -38,7 +38,12 @@ function App() {
   const provider = getMarketDataProvider(source);
   const [settings, setSettings] = useState<ScreenerSettings>(() => loadSettings(DEFAULT_SETTINGS));
   const [instruments, setInstruments] = useState<Instrument[]>([]);
-  const [results, setResults] = useState<ScreenerResult[]>([]);
+  const [lastScanSnapshot, setLastScanSnapshot] = useState<LastScanSnapshot | null>(() => loadLastScanSnapshot());
+  const [results, setResults] = useState<ScreenerResult[]>(() => {
+    const initialSource = loadDataSource(DEFAULT_SOURCE);
+    const snapshot = loadLastScanSnapshot();
+    return snapshot?.source === initialSource ? snapshot.results : [];
+  });
   const [selectedSymbol, setSelectedSymbol] = useState(() => provider.defaultSymbol);
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
   const [candleMode, setCandleMode] = useState<CandleMode>("normal");
@@ -52,12 +57,23 @@ function App() {
   const [screening, setScreening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [mobileChartVisible, setMobileChartVisible] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => isSmallViewport());
   const activeSourceRef = useRef(source);
   const scanRequestRef = useRef(0);
+  const shouldLoadChart = !isMobileViewport || mobileChartVisible;
 
   useEffect(() => {
     saveDataSource(source);
   }, [source]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const onChange = () => setIsMobileViewport(mediaQuery.matches);
+    onChange();
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     saveSettings(settings);
@@ -114,7 +130,14 @@ function App() {
       const tickers = await provider.fetchTickers();
       const nextResults = await runScreener(settings, tickers, provider.fetchCandles);
       if (activeSourceRef.current !== requestedSource || scanRequestRef.current !== requestId) return;
+      const nextSnapshot = {
+        source: requestedSource,
+        savedAt: new Date().toISOString(),
+        results: nextResults,
+      };
       setResults(nextResults);
+      setLastScanSnapshot(nextSnapshot);
+      saveLastScanSnapshot(nextSnapshot);
       setLastUpdated(new Date());
     } catch (requestError) {
       if (activeSourceRef.current === requestedSource && scanRequestRef.current === requestId) {
@@ -135,6 +158,14 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
+    if (!shouldLoadChart) {
+      setLoadingChart(false);
+      setCandles([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setLoadingChart(true);
     setError(null);
     setCandles([]);
@@ -153,10 +184,16 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [provider, selectedSymbol, timeframe]);
+  }, [provider, selectedSymbol, shouldLoadChart, timeframe]);
 
   useEffect(() => {
     let cancelled = false;
+    if (!shouldLoadChart) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const requiredTimeframes = Array.from(
       new Set(
         chartIndicators
@@ -184,7 +221,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [chartIndicators, indicatorCandles, provider, selectedSymbol, source, timeframe]);
+  }, [chartIndicators, indicatorCandles, provider, selectedSymbol, shouldLoadChart, source, timeframe]);
 
   const selectedTrendlines = useMemo(
     () => trendlines.filter((line) => line.symbol === selectedSymbol && line.timeframe === timeframe),
@@ -223,11 +260,13 @@ function App() {
     if (nextSource === source) return;
     const nextProvider = getMarketDataProvider(nextSource);
     const currentBase = baseCurrencyFromSymbol(selectedSymbol);
+    const snapshot = loadLastScanSnapshot();
     activeSourceRef.current = nextSource;
     scanRequestRef.current += 1;
     setSource(nextSource);
     setInstruments([]);
-    setResults([]);
+    setLastScanSnapshot(snapshot);
+    setResults(snapshot?.source === nextSource ? snapshot.results : []);
     setCandles([]);
     setIndicatorCandles({});
     setWatchlist(loadWatchlist(nextSource, nextProvider.defaultWatchlist));
@@ -239,6 +278,8 @@ function App() {
   }
 
   const selectedIsWatched = watchlist.includes(selectedSymbol);
+  const snapshotMatchesSource = lastScanSnapshot?.source === source;
+  const workspaceClassName = mobileChartVisible ? "workspace mobile-chart-open" : "workspace mobile-chart-hidden";
 
   return (
     <main className="shell">
@@ -269,7 +310,19 @@ function App() {
         </div>
       ) : null}
 
-      <section className="workspace">
+      <div className="mobile-chart-toggle">
+        <button
+          className="secondary-button"
+          type="button"
+          aria-expanded={mobileChartVisible}
+          onClick={() => setMobileChartVisible((current) => !current)}
+        >
+          <BarChart3 size={16} />
+          {mobileChartVisible ? "Hide chart workspace" : "Show chart workspace"}
+        </button>
+      </div>
+
+      <section className={workspaceClassName}>
         <aside className="sidebar" aria-label="Watchlist and markets">
           <label className="search-box">
             <Search size={16} />
@@ -363,6 +416,11 @@ function App() {
           <div>
             <span className="eyebrow">Crypto Screener</span>
             <h2>{watchlistOnly ? "Matching Watchlist Perpetuals" : "Matching USDT Perpetuals"}</h2>
+            {lastScanSnapshot && snapshotMatchesSource ? (
+              <small className="snapshot-meta">
+                Last saved scan {formatSnapshotTime(lastScanSnapshot.savedAt)} · {provider.label}
+              </small>
+            ) : null}
           </div>
           <div className="result-count">
             <Activity size={16} />
@@ -378,6 +436,17 @@ function App() {
       </section>
     </main>
   );
+}
+
+function isSmallViewport(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches;
+}
+
+function formatSnapshotTime(savedAt: string): string {
+  return new Date(savedAt).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function buildIndicatorCandleSets(

@@ -3,6 +3,7 @@ import type {
   BollingerChartIndicator,
   BollingerFilter,
   ChartIndicator,
+  LastScanSnapshot,
   LegacyMacdFilter,
   MacdChartIndicator,
   MacdFilter,
@@ -10,6 +11,7 @@ import type {
   RsiChartIndicator,
   RsiFilter,
   ScreenerFilter,
+  ScreenerResult,
   ScreenerSettings,
   Trendline,
 } from "../types";
@@ -20,6 +22,7 @@ const GATE_WATCHLIST_KEY = "gate-screener-watchlist-v1";
 const TRENDLINES_KEY = "okx-screener-trendlines-v1";
 const CHART_INDICATORS_KEY = "okx-chart-indicators-v1";
 const DATA_SOURCE_KEY = "momentumscope-data-source-v1";
+const LAST_SCAN_KEY = "momentumscope-last-scan-v1";
 
 export function loadSettings(defaults: ScreenerSettings): ScreenerSettings {
   const stored = loadJson<Partial<ScreenerSettings>>(SETTINGS_KEY, defaults);
@@ -49,6 +52,15 @@ export function loadWatchlist(source: MarketDataSource, defaults: string[]): str
 
 export function saveWatchlist(source: MarketDataSource, symbols: string[]): void {
   localStorage.setItem(source === "okx" ? OKX_WATCHLIST_KEY : GATE_WATCHLIST_KEY, JSON.stringify(symbols));
+}
+
+export function loadLastScanSnapshot(): LastScanSnapshot | null {
+  const stored = loadJson<unknown>(LAST_SCAN_KEY, null);
+  return normalizeLastScanSnapshot(stored);
+}
+
+export function saveLastScanSnapshot(snapshot: LastScanSnapshot): void {
+  localStorage.setItem(LAST_SCAN_KEY, JSON.stringify(snapshot));
 }
 
 export function loadTrendlines(): Trendline[] {
@@ -113,6 +125,51 @@ function normalizeChartIndicator(value: unknown): ChartIndicator | null {
   if (indicator.kind === "rsi") return normalizeRsiIndicator(indicator as Partial<RsiChartIndicator>);
   if (indicator.kind === "bollinger") return normalizeBollingerIndicator(indicator as Partial<BollingerChartIndicator>);
   return null;
+}
+
+function normalizeLastScanSnapshot(value: unknown): LastScanSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const snapshot = value as Partial<LastScanSnapshot>;
+  if (snapshot.source !== "okx" && snapshot.source !== "gate") return null;
+  if (typeof snapshot.savedAt !== "string" || Number.isNaN(Date.parse(snapshot.savedAt))) return null;
+  if (!Array.isArray(snapshot.results)) return null;
+
+  const results = snapshot.results.filter(isScreenerResult);
+  if (results.length !== snapshot.results.length) return null;
+
+  return {
+    source: snapshot.source,
+    savedAt: snapshot.savedAt,
+    results,
+  };
+}
+
+function isScreenerResult(value: unknown): value is ScreenerResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<ScreenerResult>;
+  return (
+    typeof result.instId === "string" &&
+    isFiniteNumber(result.last) &&
+    isFiniteNumber(result.change24hPct) &&
+    isFiniteNumber(result.volume24hUsd) &&
+    isNullableFiniteNumber(result.macd5m) &&
+    isNullableFiniteNumber(result.macd15m) &&
+    isNullableFiniteNumber(result.macd1H) &&
+    isNullableFiniteNumber(result.macd4H) &&
+    isNullableFiniteNumber(result.macd1D) &&
+    isNullableFiniteNumber(result.rsi15m) &&
+    typeof result.bbPosition === "string" &&
+    typeof result.matched === "boolean" &&
+    typeof result.reason === "string"
+  );
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNullableFiniteNumber(value: unknown): value is number | null {
+  return value === null || isFiniteNumber(value);
 }
 
 function normalizeMacdIndicator(indicator: Partial<MacdChartIndicator>): MacdChartIndicator {

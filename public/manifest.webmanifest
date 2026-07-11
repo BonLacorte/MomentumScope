@@ -1,0 +1,17 @@
+{
+  "name": "MomentumScope",
+  "short_name": "MomentumScope",
+  "description": "Screener-first crypto momentum scanner for USDT perpetual markets.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050608",
+  "theme_color": "#050608",
+  "icons": [
+    {
+      "src": "/icons/momentumscope.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
