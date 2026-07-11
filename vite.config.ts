@@ -11,6 +11,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/okx/, ""),
       },
+      "/gate": {
+        target: "https://api.gateio.ws",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/gate/, ""),
+      },
     },
   },
 });

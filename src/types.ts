@@ -1,5 +1,6 @@
 export type Timeframe = "5m" | "15m" | "1H" | "4H" | "1D";
 export type CandleMode = "normal" | "heikin";
+export type MarketDataSource = "okx" | "gate";
 
 export type Candle = {
   time: number;

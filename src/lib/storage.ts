@@ -6,6 +6,7 @@ import type {
   LegacyMacdFilter,
   MacdChartIndicator,
   MacdFilter,
+  MarketDataSource,
   RsiChartIndicator,
   RsiFilter,
   ScreenerFilter,
@@ -14,9 +15,11 @@ import type {
 } from "../types";
 
 const SETTINGS_KEY = "okx-screener-settings-v1";
-const WATCHLIST_KEY = "okx-screener-watchlist-v1";
+const OKX_WATCHLIST_KEY = "okx-screener-watchlist-v1";
+const GATE_WATCHLIST_KEY = "gate-screener-watchlist-v1";
 const TRENDLINES_KEY = "okx-screener-trendlines-v1";
 const CHART_INDICATORS_KEY = "okx-chart-indicators-v1";
+const DATA_SOURCE_KEY = "momentumscope-data-source-v1";
 
 export function loadSettings(defaults: ScreenerSettings): ScreenerSettings {
   const stored = loadJson<Partial<ScreenerSettings>>(SETTINGS_KEY, defaults);
@@ -31,12 +34,21 @@ export function saveSettings(settings: ScreenerSettings): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-export function loadWatchlist(defaults: string[]): string[] {
-  return loadJson(WATCHLIST_KEY, defaults);
+export function loadDataSource(defaultSource: MarketDataSource): MarketDataSource {
+  const stored = loadJson<unknown>(DATA_SOURCE_KEY, defaultSource);
+  return stored === "okx" || stored === "gate" ? stored : defaultSource;
 }
 
-export function saveWatchlist(symbols: string[]): void {
-  localStorage.setItem(WATCHLIST_KEY, JSON.stringify(symbols));
+export function saveDataSource(source: MarketDataSource): void {
+  localStorage.setItem(DATA_SOURCE_KEY, JSON.stringify(source));
+}
+
+export function loadWatchlist(source: MarketDataSource, defaults: string[]): string[] {
+  return loadJson(source === "okx" ? OKX_WATCHLIST_KEY : GATE_WATCHLIST_KEY, defaults);
+}
+
+export function saveWatchlist(source: MarketDataSource, symbols: string[]): void {
+  localStorage.setItem(source === "okx" ? OKX_WATCHLIST_KEY : GATE_WATCHLIST_KEY, JSON.stringify(symbols));
 }
 
 export function loadTrendlines(): Trendline[] {

@@ -1,5 +1,5 @@
 import { calculateBollingerBands, calculateMacd, calculateRsi, type MacdPoint } from "./indicators";
-import { fetchCandles } from "./okx";
+import type { MarketDataProvider } from "./marketData";
 import type { BollingerFilter, Candle, MacdCondition, MacdFilter, MacdPlot, RangeCondition, RsiFilter, ScreenerFilter, ScreenerResult, ScreenerSettings, Ticker, Timeframe } from "../types";
 
 const MAX_INDICATOR_CANDIDATES = 20;
@@ -8,7 +8,11 @@ const RESULT_TIMEFRAMES: Timeframe[] = ["15m", "1H", "4H"];
 
 type CandleMap = Partial<Record<Timeframe, Candle[]>>;
 
-export async function runScreener(settings: ScreenerSettings, tickers: Ticker[]): Promise<ScreenerResult[]> {
+export async function runScreener(
+  settings: ScreenerSettings,
+  tickers: Ticker[],
+  fetchCandles: MarketDataProvider["fetchCandles"],
+): Promise<ScreenerResult[]> {
   const prefiltered = tickers
     .filter((ticker) => settings.filters.every((filter) => evaluateTickerFilter(filter, ticker)))
     .slice(0, MAX_INDICATOR_CANDIDATES);
@@ -16,7 +20,7 @@ export async function runScreener(settings: ScreenerSettings, tickers: Ticker[])
   const results = await mapWithConcurrency(prefiltered, SCAN_CONCURRENCY, async (ticker) => {
     try {
       const technicalFilters = settings.filters.filter((filter) => filter.category === "technical");
-      const candleMap = await fetchRequiredCandles(ticker.instId, technicalFilters);
+      const candleMap = await fetchRequiredCandles(ticker.instId, technicalFilters, fetchCandles);
       const matched = technicalFilters.every((filter) => evaluateTechnicalFilter(filter, candleMap));
       const macd5m = latestMacd(candleMap["5m"]);
       const macd15m = latestMacd(candleMap["15m"]);
@@ -133,7 +137,11 @@ function evaluateBollinger(filter: BollingerFilter, candles: Candle[]): boolean 
   }
 }
 
-async function fetchRequiredCandles(instId: string, filters: ScreenerFilter[]): Promise<CandleMap> {
+async function fetchRequiredCandles(
+  instId: string,
+  filters: ScreenerFilter[],
+  fetchCandles: MarketDataProvider["fetchCandles"],
+): Promise<CandleMap> {
   const requiredTimeframes = Array.from(
     new Set<Timeframe>([...RESULT_TIMEFRAMES, ...filters.map((filter) => filter.category === "technical" ? filter.timeframe : "15m")]),
   );

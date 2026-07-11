@@ -3,10 +3,11 @@ import type { ScreenerResult } from "../types";
 type Props = {
   results: ScreenerResult[];
   selectedSymbol: string;
+  formatSymbol: (symbol: string) => string;
   onSelect: (symbol: string) => void;
 };
 
-export default function ResultsTable({ results, selectedSymbol, onSelect }: Props) {
+export default function ResultsTable({ results, selectedSymbol, formatSymbol, onSelect }: Props) {
   return (
     <div className="table-wrap">
       <table>
@@ -40,7 +41,7 @@ export default function ResultsTable({ results, selectedSymbol, onSelect }: Prop
                 onClick={() => onSelect(result.instId)}
               >
                 <td>
-                  <strong>{result.instId.replace("-USDT-SWAP", "")}</strong>
+                  <strong>{formatSymbol(result.instId)}</strong>
                   <small>USDT Perp</small>
                 </td>
                 <td>{formatNumber(result.last)}</td>

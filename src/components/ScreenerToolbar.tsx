@@ -1,12 +1,14 @@
 import { ChevronDown, Plus, Settings, SlidersHorizontal, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { BollingerFilter, MacdCondition, MacdFilter, MacdPlot, MacdTarget, RangeCondition, RsiFilter, ScreenerFilter, ScreenerSettings, Timeframe, VolumeUsdFilter } from "../types";
+import type { BollingerFilter, MacdCondition, MacdFilter, MacdPlot, MacdTarget, MarketDataSource, RangeCondition, RsiFilter, ScreenerFilter, ScreenerSettings, Timeframe, VolumeUsdFilter } from "../types";
 
 type Props = {
   settings: ScreenerSettings;
   watchlistOnly: boolean;
   watchlistCount: number;
+  source: MarketDataSource;
   onChange: (settings: ScreenerSettings) => void;
+  onSourceChange: (source: MarketDataSource) => void;
   onWatchlistOnlyChange: (value: boolean) => void;
 };
 
@@ -28,7 +30,7 @@ const VOLUME_PRESETS: Array<{ value: VolumePreset; label: string; filter: Omit<V
   { value: "manual", label: "Manual setup", filter: { condition: "between", from: 0, to: 100_000_000 } },
 ];
 
-export default function ScreenerToolbar({ settings, watchlistOnly, watchlistCount, onChange, onWatchlistOnlyChange }: Props) {
+export default function ScreenerToolbar({ settings, watchlistOnly, watchlistCount, source, onChange, onSourceChange, onWatchlistOnlyChange }: Props) {
   const [showBuilder, setShowBuilder] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [builderCategory, setBuilderCategory] = useState<BuilderCategory>("marketData");
@@ -149,7 +151,14 @@ export default function ScreenerToolbar({ settings, watchlistOnly, watchlistCoun
           </select>
           <ChevronDown size={15} />
         </label>
-        <FilterButton label="Exchange" value="OKX" />
+        <label className="dropdown-pill">
+          <span>Exchange</span>
+          <select value={source} onChange={(event) => onSourceChange(event.target.value as MarketDataSource)}>
+            <option value="gate">Gate.io</option>
+            <option value="okx">OKX</option>
+          </select>
+          <ChevronDown size={15} />
+        </label>
         <FilterButton label="Symbol type" value="Perpetual" />
         <FilterButton label="Base currency" value="All" />
         <FilterButton label="Quote currency" value="USDT" />
